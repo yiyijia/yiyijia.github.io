@@ -25,13 +25,18 @@ sed -i ';:x:N:s/if \[.*\; then\n.*return 0\n.*fi/#tb/;b x'; /etc/init.d/dropbear
 
 
 # 步骤：
-1. 执行 python3 remote_command_execution_vulnerability.py ,输入 stok (来源于路由器登录后url)
+1. 手工更新固件：miwifi_r3l_firmware_a5c81_2.9.217.bin ，rom版本 2.9.217 , 
+   ![图示][upgrade_pic]
+   备注：测试过 miwifi_r3l_all_23e37_2.8.51_INT.bin 不可用,其他版本未测试
+
+2. 升级成功后 登录管理页面, 从url获取stok
+3. 执行 python3 remote_command_execution_vulnerability.py ,输入 stok (来源于路由器登录后url)
 {% highlight bash %}
 % python3 remote_command_execution_vulnerability.py 
 stok: 03b2da2xxxxx
 {% endhighlight %}
 
-2. 执行后 就应该能登录了, ssh root/admin
+4. 执行后 就应该能登录了, ssh root/admin
    `ssh root@192.168.31.1 `
 
 # 折腾过程
@@ -58,3 +63,4 @@ stok: 03b2da2xxxxx
 [remote_command_execution_vulnerability.py]:/assets/remote_command_execution_vulnerability.py
 [howblog github]: https://github.com/mysansa52/howblog.github.io/issues
 [remote_command_execution_vulnerability]: https://github.com/yiyijia/yiyijia.github.io/blob/master/assets/remote_command_execution_vulnerability.py
+[upgrade_pic]:/assets/upgrade.png
