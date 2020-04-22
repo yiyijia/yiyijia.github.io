@@ -15,6 +15,8 @@ sed -i ';:x:N:s/if \[.*\; then\n.*return 0\n.*fi/#tb/;b x'; /etc/init.d/dropbear
 /etc/init.d/dropbear start
 (echo 'admin'; sleep 1; echo 'admin') | passwd 'root' >/dev/null 2>&1
   ```
+  具体实现查看: [remote_command_execution_vulnerability]
+
 ### 工具
 1. 固件：[miwifi_r3l_firmware_a5c81_2.9.217.bin]
 2. python3
@@ -55,3 +57,4 @@ stok: 03b2da2xxxxx
 [miwifi_r3l_firmware_a5c81_2.9.217.bin]: /assets/miwifi_r3l_firmware_a5c81_2.9.217.bin
 [remote_command_execution_vulnerability.py]:/assets/remote_command_execution_vulnerability.py
 [howblog github]: https://github.com/mysansa52/howblog.github.io/issues
+[remote_command_execution_vulnerability]: https://github.com/yiyijia/yiyijia.github.io/blob/master/assets/remote_command_execution_vulnerability.py
