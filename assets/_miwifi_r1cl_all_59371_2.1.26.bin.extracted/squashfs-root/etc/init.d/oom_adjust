@@ -1,0 +1,23 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2006-2011 OpenWrt.org
+
+START=99
+
+start() {
+	#avoid oom base on task name
+	[ -f /etc/oom_tasklist ] || exit 0
+
+	while read line
+	do
+		pids=`pidof $line`
+
+		[ -z "$pids" ] && continue
+
+		for pid in $pids
+		do
+#			echo "each pid = $pid"
+			echo -1000 > /proc/"$pid"/oom_score_adj
+		done
+
+	done < /etc/oom_tasklist
+}

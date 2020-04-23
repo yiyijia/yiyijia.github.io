@@ -1,0 +1,15 @@
+#!/bin/sh
+
+if [ "$ACTION" = "ifup" -a "$INTERFACE" = "lan" ]; then
+    # for http status
+    if [ -f /etc/init.d/http_status_stat ]; then
+        /etc/init.d/http_status_stat is_enabled
+        if [ $? -eq 1 ]; then
+            logger -t "hotplug.d" "http_stat_proxy refresh_lan"
+            /etc/init.d/http_status_stat refresh_lan
+        fi
+    fi
+
+    # for http url
+    [ -f /etc/init.d/http_url_proxy ] && /etc/init.d/http_url_proxy restart
+fi

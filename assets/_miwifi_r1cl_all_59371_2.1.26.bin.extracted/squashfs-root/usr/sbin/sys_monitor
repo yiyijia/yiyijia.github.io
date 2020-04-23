@@ -1,0 +1,68 @@
+#!/bin/sh
+
+export LOGTAG="sys_monitor"
+LOGFILE="/tmp/sysmonitor.log"
+TSTAMPFILE="/tmp/kmem_upload_time"
+
+dlog(){
+	local oneline
+	oneline="$@"
+	if [ -x /usr/bin/logger ]
+		then
+		logger -s -p err -t "$LOGTAG" -- "$oneline"
+	else
+		echo "`date` ${LOGTAG}[${$}]: $oneline"
+	fi
+}
+
+stat_kernel_mem() {
+	logger stat_points_none kernel_freemem="$FREEMEM"
+	logger stat_points_none kernel_lowmem=1
+
+	#收集内存日志
+	echo "####################" > "$LOGFILE"
+	top -b -n1 >> "$LOGFILE"
+	echo "Meminfo" >> "$LOGFILE"
+	cat /proc/meminfo >> "$LOGFILE"
+	echo "Vmstat" >> "$LOGFILE"
+	cat /proc/vmstat >> "$LOGFILE"
+	gzip "$LOGFILE"
+	/usr/sbin/logupload.lua 0 3 0 ""$LOGFILE".gz" & 2>/dev/null
+
+	date +%s > "$TSTAMPFILE"
+}
+
+#禁止oom杀死本脚本
+echo -1000 > /proc/$$/oom_score_adj
+
+FREEMEM=`free | grep Mem | awk '{ print $4 }'`
+MINMEM=`cat /proc/sys/vm/min_free_kbytes`
+THRESGHOLD=`expr $MINMEM + 4096`
+
+#dlog FREEMEM=$FREEMEM THRESGHOLD=$THRESGHOLD
+
+if [ $FREEMEM -lt $THRESGHOLD ] ; then
+	dlog "mem is less than $THRESGHOLD drop_caches"
+	sync
+	echo 3 >  /proc/sys/vm/drop_caches
+
+	 #增加内存碎片整理
+	echo 1 > /proc/sys/vm/compact_memory
+
+	FREEMEM=`free | grep Mem | awk '{ print $4 }'`
+	if [ $FREEMEM -lt $THRESGHOLD ] ; then
+		if [ -f "$TSTAMPFILE" ]; then
+			last_time=`cat "$TSTAMPFILE"`
+			curr_time=`date +%s`
+			gap=$(($curr_time-$last_time))
+
+			#upload log every 1 hour
+			if [ "$gap" -gt "3600" ]; then
+				stat_kernel_mem
+			fi
+		else
+			stat_kernel_mem
+		fi
+	fi
+fi
+

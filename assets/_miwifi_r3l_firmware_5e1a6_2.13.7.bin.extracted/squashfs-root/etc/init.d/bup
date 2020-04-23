@@ -1,0 +1,26 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2006-2011 OpenWrt.org
+
+START=99zzz
+
+SERVER_ADDR="255.255.255.255"
+SERVER_PORT=10000
+
+prepare_elink_proc() {
+	KOPATH="/lib/modules/$(uname -r)/elink_proc.ko"
+	[ -f "$KOPATH" ] && insmod "$KOPATH"
+}
+
+start() {
+
+	flag=`uci -q get xiaoqiang.common.INITTED`
+	[ "$flag" = "YES" ] && return 0
+
+	prepare_elink_proc
+
+	/usr/sbin/bup_c $SERVER_ADDR $SERVER_PORT &
+
+	return 0
+}
+
+

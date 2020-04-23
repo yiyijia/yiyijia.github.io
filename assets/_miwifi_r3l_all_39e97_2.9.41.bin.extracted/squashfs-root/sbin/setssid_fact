@@ -1,0 +1,34 @@
+#!/bin/sh
+
+mac=`iwpriv wl1 e2p 2c | grep '0x'`
+
+b1=`echo ${mac} | cut -b 12-13`
+b2=`echo ${mac} | cut -b 14-15`
+
+intf_5g=`ifconfig | grep -w wl0`
+[ ! -z "$intf_5g" ] && bdata set "wl0_ssid=Xiaomi_${b2}${b1}_5G"
+bdata set "wl1_ssid=Xiaomi_${b2}${b1}"
+bdata sync
+bdata commit
+
+# generate "initial ssid".
+num=`nvram get wl1_ssid | cut -b 8-11`
+temp=0x"$num"
+newnum="000"`printf "%x\n" $((0xffff-$temp))`
+pos=`expr length $newnum - 4`
+newnum=`echo ${newnum:$pos:4} | tr [a-z] [A-Z]`
+
+ssid2G=`nvram get wl1_ssid`
+result2G=`echo $ssid2G"_"$newnum`
+nvram set wl1_ssid=$result2G
+
+[ ! -z "$intf_5g" ] && {
+	ssid5G=`nvram get wl0_ssid | cut -b -11`
+	result5G=`echo $ssid5G"_"$newnum"_5G"`
+	nvram set wl0_ssid=$result5G
+}
+nvram commit
+
+# actual SSID is updated in /etc/init.d/boot by calling /sbin/wifi detect when next boot
+rm -f /etc/config/wireless
+sync

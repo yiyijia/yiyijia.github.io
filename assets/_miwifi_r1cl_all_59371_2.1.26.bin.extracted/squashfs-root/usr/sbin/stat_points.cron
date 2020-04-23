@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# use crond to run?
+#
+. /lib/lib.scripthelper.sh
+#
+#run in daemon
+#procdaemon mute
+THRESHOLD=70 # disk use in percent
+FILE_SIZE=8 # kilobytes
+SLEEP_TIME=300 # check every 5 mins
+MAX_COUNT=12 # 5*12 will be 60 mins, one hour
+
+do_statpoints() {
+     ST=$(cat /proc/uptime | cut -d' ' -f1 | cut -d'.' -f1)
+     /usr/sbin/StatPoints
+     ET=$(cat /proc/uptime | cut -d' ' -f1 | cut -d'.' -f1)
+     return $((ET-ST))
+}
+
+counter=0
+while true
+do
+    sleep $SLEEP_TIME
+    # upload log and reclaim space if /tmp used THRESHOLD capacity
+    tu=$(df /tmp/ | tail -n 1 | tr -s ' ' '\t' | cut -f 5 | tr -d '%')
+    [ $tu -gt $THRESHOLD ] && {
+	counter=0
+	# timestamp for StatPoints command
+	do_statpoints
+	ts=$?
+	tu=$(df /tmp/ | tail -n 1 | tr -s ' ' '\t' | cut -f 5 | tr -d '%')
+	logger stat_points_none log_up_tmp="$tu,$ts"
+	continue # sleep again
+    }
+
+    # and if one of stat_points_*.log file lager than FILE_SIZE
+    for i in /tmp/stat_points_*.log
+    do
+	fs=$(du "$i")
+	s=$(echo "$fs" | cut -f 1)
+	[ $s -gt $FILE_SIZE ] && {
+	    counter=0
+	    do_statpoints
+	    ts=$?
+	    name=$(echo "$fs" | cut -f 2)
+	    logger stat_points_none log_up_file="$name,$ts"
+	    break # all stat points file have been uploaded.
+	}
+    done
+
+    # like used to be, upload every one hour
+    [ $counter -ge $MAX_COUNT ] && {
+	counter=0
+	do_statpoints
+	ts=$?
+	logger stat_points_none log_up_file="hourly,$ts"
+    }
+    let counter+=1
+done
+

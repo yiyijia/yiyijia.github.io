@@ -1,0 +1,47 @@
+#!/bin/sh /etc/rc.common
+
+STOP=21
+
+export PROCLINE="/usr/sbin/securitypage -c /etc/config/securitypage/securitycenter.conf"
+export PROC_USE_CGROUP_PATH="/dev/cgroup/net_cls/limited/tasks;/dev/cgroup/mem/group1/tasks"
+
+ENABELTAG="/etc/config/securitypage/enable.tag"
+
+start() {
+        if [ -f $ENABELTAG ];
+        then
+          echo "security page enabled."
+        else
+          return $?
+        fi
+
+	security_cfg.sh on
+	echo 1 > /proc/sys/net/ipv4/http_security_switch
+
+	/usr/sbin/supervisord start
+	return $?
+}
+
+restart() {
+	stop
+	sleep 1
+	start
+	return $?
+}
+
+shutdown() {
+	stop
+	return $?
+}
+
+stop() {
+	security_cfg.sh off
+	/usr/sbin/supervisord stop
+	return $?
+}
+
+status() {
+	/usr/sbin/supervisord status
+	return $?
+}
+#

@@ -1,0 +1,199 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+CFG_PATH="/proc/sys/net/ipv4/tcp_proxy_action"
+SWITCH_PATH="/proc/sys/net/ipv4/tcp_proxy_switch"
+set_switch_on="uci set http_url_proxy.settings.enabled=1"
+set_switch_off="uci set http_url_proxy.settings.enabled=0"
+set_switch_commit="uci commit http_url_proxy"
+restart_dnsmasq='/etc/init.d/dnsmasq restart'
+LIP=`uci get network.lan.ipaddr 2>/dev/null`
+LMASK=`uci get network.lan.netmask 2>/dev/null`
+PROXY_PORT=8381
+fastpath=""
+
+APP_CTF_MGR="/usr/sbin/ctf_manger.sh"
+export EXTRA_COMMANDS=" on off log_stat"
+export EXTRA_HELP="	on	Switch to the start state and start
+	off	Switch to the stop state and stop
+	log_stat	log statistics"
+
+KR_EXECMD="/usr/sbin/kr_query"
+KR_EXTRA_FLAG="/usr/sbin/kr_query"
+
+# only R1CL now
+is_support_model() {
+    boardversion=`cat /proc/xiaoqiang/model 2>/dev/null`
+    if [ $boardversion == "R1CL" ]; then
+        return 1
+    fi
+    return 0
+}
+
+is_repeater() {
+    netmode=`uci -q -S get xiaoqiang.common.NETMODE`
+    if [ "$netmode" == "wifiapmode" -o "$netmode" == "lanapmode" ]; then
+        is_support_model
+        if [ $? -eq 1 ]; then
+            return 1
+        fi
+    fi
+    return 0
+}
+
+log_stat_normal() {
+    url_stat_file="/proc/http_url/url_stats"
+    if [ -f $url_stat_file ]; then
+        line=`cat $url_stat_file`
+        v1=`echo $line | awk -F ";" '{print $1}' | awk -F ":" '{print $2}'`
+        v2=`echo $line | awk -F ";" '{print $2}' | awk -F ":" '{print $2}'`
+        v3=`echo $line | awk -F ";" '{print $3}' | awk -F ":" '{print $2}'`
+        v4=`echo $line | awk -F ";" '{print $4}' | awk -F ":" '{print $2}'`
+        v5=`echo $line | awk -F ";" '{print $5}' | awk -F ":" '{print $2}'`
+        v6=`echo $line | awk -F ";" '{print $6}' | awk -F ":" '{print $2}'`
+        logger stat_points_privacy reap_url_stat=$v1,$v2,$v3,$v4,$v5,$v6
+        echo "0" > $url_stat_file
+    fi
+}
+
+br_log_stat() {
+    url_stat_file="/proc/br_http_url/url_stats"
+    if [ -f $url_stat_file ]; then
+        line=`cat $url_stat_file`
+        v1=`echo $line | awk -F ";" '{print $1}' | awk -F ":" '{print $2}'`
+        v2=`echo $line | awk -F ";" '{print $2}' | awk -F ":" '{print $2}'`
+        v3=`echo $line | awk -F ";" '{print $3}' | awk -F ":" '{print $2}'`
+        v4=`echo $line | awk -F ";" '{print $4}' | awk -F ":" '{print $2}'`
+        logger stat_points_privacy br_reap_url_stat=$v1,$v2,$v3,$v4
+        echo "0" > $url_stat_file
+    fi
+}
+
+log_stat() {
+    is_repeater
+    if [ $? -eq "1" ]; then
+        br_log_stat
+    else
+        log_stat_normal
+    fi
+}
+
+init_kmod() {
+    insmod nf_conn_ext_http >/dev/null 2>&1
+    is_repeater
+    if [ $? -eq "1" ]; then
+        insmod br_http >/dev/null 2>&1
+    else
+        insmod nf_tcp_proxy >/dev/null 2>&1
+        #echo "open and set proxy action to kernel"
+        echo "ADD 7 $LIP $PROXY_PORT" > $CFG_PATH
+        # ensure start switch
+        echo "1" > $SWITCH_PATH
+        insmod http_url >/dev/null 2>&1
+        sysctl -w net.ipv4.tcp_timestamps=0 >/dev/null 2>&1
+    fi
+}
+
+start() {
+    config_load "http_url_proxy"
+    local switch
+    switch=`uci get http_url_proxy.settings.enabled -q`
+    if [ $switch -ne "1" ]; then
+        return 0
+    fi
+    local cc=$(bdata get CountryCode)
+    cc=${cc:-"CN"}
+    if [ $cc != "CN" ]; then
+        echo "http_stat: Bad Country!"
+        return 0
+    fi
+
+    fastpath=`uci get misc.http_proxy.fastpath -q`
+    [ -z $fastpath ] && return 0
+
+    if [ $fastpath == "ctf" ]; then
+        if [ -f $APP_CTF_MGR ]; then
+            $APP_CTF_MGR http_stat http on
+        fi
+    elif [ $fastpath == "hwnat" ]; then
+        echo "http_url_proxy: can work with hw_nat."
+    else
+        echo "http_url_proxy.init: unknown fastpath type! Treat as std!"
+    fi
+    init_kmod
+
+    ipset flush    kr_query
+    ipset destroy  kr_query
+    ipset create   kr_query hash:net
+    iptables -t mangle -A fwmark -p tcp -m set --match-set kr_query dst -m comment --comment kr_query -j MARK --set-xmark 0x4/0x4
+
+uci -q batch <<-EOF >/dev/null
+    set firewall.kr_query=include
+    set firewall.kr_query.path="/lib/firewall.sysapi.loader kr_query"
+    set firewall.kr_query.reload=1
+    commit firewall
+EOF
+
+    export PROCLINE="${KR_EXECMD}"
+    export PROCFLAG="${KR_EXTRA_FLAG}"
+    export PROCNUM='1'
+    /usr/sbin/supervisord start
+
+    return 0
+}
+
+stop() {
+    kill -9 `cat /tmp/kr_query.pid`
+    export PROCLINE="${KR_EXECMD}"
+    export PROCFLAG="${KR_EXTRA_FLAG}"
+    /usr/sbin/supervisord stop
+
+    # log stat before stop
+    log_stat
+    rmmod http_url >/dev/null 2>&1
+    rmmod nf_tcp_proxy >/dev/null 2>&1
+    # for repeater mode
+    rmmod br_http >/dev/null 2>&1
+
+    fastpath=`uci get misc.http_proxy.fastpath -q`
+    [ -z $fastpath ] && return 0
+
+    if [ $fastpath == "ctf" ]; then
+        if [ -f $APP_CTF_MGR ]; then
+            $APP_CTF_MGR http_stat http off
+        fi
+    elif [ $fastpath == "hwnat" ]; then
+        echo "http_url_proxy: stopped."
+    else
+        echo "http_url_proxy: unknown fastpath type! Treat as std!"
+    fi
+
+uci -q batch <<-EOF >/dev/null
+    del firewall.kr_query
+    commit firewall
+EOF
+
+    iptables -t mangle -D fwmark -p tcp -m set --match-set kr_query dst -m comment --comment kr_query -j MARK --set-mark 0x04/0x00000004
+    ipset flush    kr_query
+    ipset destroy  kr_query
+
+    return 0
+}
+
+off(){
+    stop
+    $set_switch_off >/dev/null 2>&1
+    $set_switch_commit >/dev/null 2>&1
+    $restart_dnsmasq
+    return $?
+}
+
+on(){
+    $set_switch_on >/dev/null 2>&1
+    $set_switch_commit >/dev/null 2>&1
+    $restart_dnsmasq
+    start
+    return $?
+}
+

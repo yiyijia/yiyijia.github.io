@@ -1,0 +1,24 @@
+#!/bin/sh /etc/rc.common
+START=87
+export PROCLINE="/usr/sbin/uaq-agent"
+export PROCFLAG="/usr/sbin/uaq-agent"
+export PROC_USE_CGROUP_PATH="/dev/cgroup/cpu/plugin/tasks"
+export DELAY_FLAG=1
+
+start() {
+    ft_mode=`cat /proc/xiaoqiang/ft_mode`
+    if [ "$ft_mode" -ne "0" ]; then
+        return 0
+    fi
+
+	local cc=$(bdata get CountryCode)
+    if [ $cc != "CN" ]; then
+        return 0
+    fi
+
+    /usr/sbin/supervisord start
+}
+
+stop() {
+    /usr/sbin/supervisord stop
+}

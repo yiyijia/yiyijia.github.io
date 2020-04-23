@@ -1,0 +1,53 @@
+#!/bin/sh
+
+usage() {
+	echo "wifi_radio <wl1 | wl0 >  { <on | 0ff> | <1 | 0>}"
+	echo "example: wifi_radio wl0 on"
+	echo "         wifi_radio wl0 1"
+}
+
+set_wl1_radio_on() {
+	ifconfig wl1 down
+
+	uci set wireless.mt7628.disabled=0
+	uci commit wireless
+
+	ifconfig wl1 up
+
+	nvram set wl1_radio=1
+	nvram commit
+
+	[ -L /sys/class/net/br-lan/brif/wl1 ] || brctl addif br-lan wl1
+}
+
+
+set_wl1_radio_off() {
+	ifconfig wl1 down
+
+	uci set wireless.mt7628.disabled=1
+	uci commit wireless
+
+	nvram set wl1_radio=0
+	nvram commit
+
+	[ -L /sys/class/net/br-lan/brif/wl1 ] && brctl delif br-lan wl1
+}
+
+case "$1" in
+	wl1)
+	case "$2" in
+		on | 1 )
+		set_wl1_radio_on
+		;;
+		off | 0 )
+		set_wl1_radio_off
+		;;
+		* )
+		usage
+		;;
+	esac
+	;;
+	* )
+	usage
+	;;
+esac

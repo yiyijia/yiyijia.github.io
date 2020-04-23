@@ -1,0 +1,38 @@
+Searching 865 files for "中继模式只能" (case sensitive)
+
+/home/wumei/worker/system/feeds/xiaoqiangLuci/luci-0.11.1-v2/modules/admin-full/luasrc/view/web/inc/aprouterchange.htm:
+   89  					<div class="arrow"></div>
+   90  					<div class="inner">
+   91: 						<%:请确认主路由器和中继路由器的Wi-Fi均已开启。%>
+   92  					</div>
+   93  				</div>
+
+/home/wumei/worker/system/feeds/xiaoqiangLuci/luci-0.11.1-v2/modules/admin-full/luasrc/view/web/inc/netmod.htm:
+  151  					<div class="arrow"></div>
+  152  					<div class="inner">
+  153: 						<%:请确认主路由器和中继路由器的Wi-Fi均已开启。%>
+  154  					</div>
+  155  				</div>
+
+/home/wumei/worker/system/feeds/xiaoqiangLuci/luci-0.11.1-v2/modules/admin-r1d/luasrc/view/web/inc/netmod.htm:
+  147                      <div class="arrow"></div>
+  148                      <div class="inner">
+  149:                         <%:请确认主路由器和中继路由器的Wi-Fi均已开启。%>
+  150                      </div>
+  151                  </div>
+
+/home/wumei/worker/system/feeds/xiaoqiangLuci/luci-0.11.1-v2/modules/admin-r2d/luasrc/view/web/inc/netmod.htm:
+  147                      <div class="arrow"></div>
+  148                      <div class="inner">
+  149:                         <%:请确认主路由器和中继路由器的Wi-Fi均已开启。%>
+  150                      </div>
+  151                  </div>
+
+/home/wumei/worker/system/feeds/xiaoqiangLuci/luci-0.11.1-v2/modules/admin-r3d/luasrc/view/web/inc/netmod.htm:
+  147                      <div class="arrow"></div>
+  148                      <div class="inner">
+  149:                         <%:请确认主路由器和中继路由器的Wi-Fi均已开启。%>
+  150                      </div>
+  151                  </div>
+
+5 matches across 5 files

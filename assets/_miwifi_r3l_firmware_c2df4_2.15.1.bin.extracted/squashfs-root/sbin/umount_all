@@ -1,0 +1,11 @@
+#!/bin/sh
+
+kill -9 -1
+
+umount /userdisk/data
+umount /userdisk
+umount /etc
+umount /data
+echo "Umount data and etc status $?"
+sync
+

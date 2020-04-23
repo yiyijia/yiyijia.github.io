@@ -1,0 +1,21 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+LOGNAME=root
+USER=root
+export PATH LOGNAME USER
+
+SPEEDUP_DIR=$2
+SPEEDUP_STATUS=$3
+SPEEDUP_THRESHOLD=$4
+SPEEDUP_CUR_SPEED=$5
+
+export SPEEDUP_DIR SPEEDUP_STATUS SPEEDUP_THRESHOLD SPEEDUP_CUR_SPEED
+
+[ \! -z "$1" -a -d /etc/traffic.d/$1 ] && {
+	for script in $(ls /etc/traffic.d/$1/* 2>&-); do (
+		[ -f $script ] && . $script
+	); done
+}

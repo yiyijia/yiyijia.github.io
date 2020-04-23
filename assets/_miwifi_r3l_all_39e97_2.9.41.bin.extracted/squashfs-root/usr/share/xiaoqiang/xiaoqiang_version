@@ -1,0 +1,23 @@
+config core 'version'
+	# ROM ver
+	option ROM '2.9.41'
+	# channel
+	option CHANNEL 'stable'
+	# hardware platform R1AC or R1N etc.
+	option HARDWARE 'R3L'
+	# CFE ver
+	option UBOOT '1.0.0'
+	# Linux Kernel ver
+	option LINUX '0.0.1'
+	# RAMFS ver
+	option RAMFS '0.0.1'
+	# SQUASHFS ver
+	option SQAFS '0.0.1'
+	# ROOTFS ver
+	option ROOTFS '0.0.1'
+	#build time
+	option BUILDTIME 'Wed, 21 Sep 2016 13:26:52 +0800'
+	#build timestamp
+	option BUILDTS '1474435612'
+	#build git tag
+	option GTAG 'commit a49b87aa12e06a46faa3ab9d887f6297c8c9d430'

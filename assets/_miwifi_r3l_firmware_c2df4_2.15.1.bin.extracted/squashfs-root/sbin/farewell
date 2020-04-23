@@ -1,0 +1,26 @@
+#!/bin/sh
+
+fairwell() {
+	# stop dog first
+	[ -e /dev/watchdog ] && /etc/init.d/softdog stop
+	# try to kill all userspace processes
+	for i in $(ps w | grep -v "PID" | awk '{print $1}'); do
+		if [ $i -gt 100 -a $i -ne $$ ]; then
+			kill -9 $i 2>/dev/null
+		fi
+	done
+}
+
+flag=`uci get xiaoqiang.common.INITTED`
+[ "$flag" = "YES" ] && exit 0
+
+fairwell
+
+# hopefully we get a clean filesystem
+umount /userdisk/data
+umount /userdisk
+umount /etc
+umount /data
+echo "Umount data and etc status $?"
+sync
+

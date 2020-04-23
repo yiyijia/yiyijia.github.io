@@ -1,0 +1,7 @@
+*/15 * * * * /usr/sbin/ntpsetclock 60 log >/dev/null 2>&1
+5 */8 * * * /usr/sbin/sec_clt.sh 600 >/dev/null 2>&1
+* * * * * /usr/sbin/startscene_crontab.lua `/bin/date "+%u %H:%M"`
+0 12 * * * /usr/sbin/recordscene_crontab.lua
+45 23 * * * /usr/sbin/points_sysset_pro.lua >/dev/null 2>&1
+0 20 * * * /usr/bin/stat_lan
+*/55 * * * * /usr/sbin/otapredownload >/dev/null 2>&1

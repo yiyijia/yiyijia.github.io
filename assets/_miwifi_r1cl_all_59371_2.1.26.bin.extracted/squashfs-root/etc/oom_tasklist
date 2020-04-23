@@ -1,0 +1,8 @@
+syslog-ng
+syslog-ng.helper
+ubusd
+netifd
+watchdog
+sysapihttpd
+taskmonitorServer
+taskmonitorDaemon

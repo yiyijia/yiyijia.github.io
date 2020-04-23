@@ -1,0 +1,15 @@
+
+config config 'global'
+	option disabled '1'
+	option type 'baidu'
+	option interval '3600'
+
+config host 'baidu'
+	option request_url 'https://anquanapi.baidu.com/api/open/adh'
+	option apikey 'zaotBXp4G4bzLGgrm3LaGfNcMMzyVavR'
+
+config whitelist 'whitelist'
+	list dns 8.8.8.8
+       	list dns 8.8.4.4
+       	list dns 114.114.114.114
+

@@ -1,0 +1,95 @@
+#!/bin/sh
+#turbo service work if interface is up/down
+#
+
+. /lib/functions/network.sh
+
+#name of ccgame interface
+s_ccgame="ccgame"
+s_ccgame_mark="0x0100/0x0300"
+s_ccgame_seq=150
+#name of ipv6 interface
+s_ipv6="ipv6"
+s_ipv6_mark="0x0200/0x300"
+s_ipv6_seq=151
+
+[ "$ACTION" = "ifup" ] && [ "$INTERFACE" = "lan" ] && {
+    network_get_subnet subnet lan
+    ip route add to $(fix_subnet $subnet) dev br-lan table $s_ccgame
+    ip route add to $(fix_subnet $subnet) dev br-lan table $s_ipv6
+}
+
+[ "$ACTION" = "ifup" ] && [ "$INTERFACE" = "guest" ] && {
+    network_get_subnet subnet guest
+    ip route add to $(fix_subnet $subnet) dev br-guest table $s_ccgame
+    ip route add to $(fix_subnet $subnet) dev br-guest table $s_ipv6
+}
+
+[ "$ACTION" = "ifup" ] && [ "$INTERFACE" = "wan" ] && {
+    # update passport once wan is up or connected again
+    ubus call turbo_ccgame update_pass '{}' >/dev/null 2>&1
+}
+
+apply_fw_rule()
+{
+    name=$1
+    mark=$2
+    seq=$3
+    tables="/etc/iproute2/rt_tables"
+    [ -n "$name" ] && {
+        grep -q $name $tables || echo "$seq $name" >> $tables
+    }
+
+    ip rule del table $name
+    ip rule add fwmark $mark table $name prio $seq
+
+    #DNS for such interface route update
+	network_get_dnsserver dnsservers $name
+	for dnsserver in $dnsservers; do
+		ip rule add to $dnsserver table $name prio $seq
+	done
+
+    ip route add default dev l2tp-$name table $name
+    ip route flush cache
+}
+
+clean_fw_rule()
+{
+    name=$1
+    ip rule del table $name
+    ip route flush cache
+}
+
+#ipv6 service
+[ "$INTERFACE" = "$s_ipv6" ] && {
+    [ "$ACTION" = "ifup" ] && {
+        #ipv6 default route (metric should be less than wan default route)
+        ip -6 route del default dev l2tp-$s_ipv6
+        ip -6 route add default dev l2tp-$s_ipv6 metric 256
+
+        apply_fw_rule $s_ipv6 $s_ipv6_mark $s_ipv6_seq
+        ubus call turbo_ipv6 event_update '{"event":"connected"}' >/dev/null 2>&1
+    }
+
+    [ "$ACTION" = "ifdown" ] && {
+        ubus call turbo_ipv6 event_update '{"event":"disconnected"}' >/dev/null 2>&1
+        ip -6 route del default dev l2tp-$s_ipv6
+        clean_fw_rule $s_ipv6
+    }
+}
+
+#ccgame serivce
+[ "$INTERFACE" = "$s_ccgame" ] && {
+    [ "$ACTION" = "ifdown" ] && {
+        clean_fw_rule $s_ccgame
+        # notice ccgame service vpn is off
+        ubus call turbo_ccgame update_vpn '{"status": 0 }' >/dev/null 2>&1
+    }
+
+    [ "$ACTION" = "ifup" ] && {
+        # notice ccgame service vpn is on
+        ubus call turbo_ccgame update_vpn '{"status": 1 }' >/dev/null 2>&1
+        apply_fw_rule $s_ccgame $s_ccgame_mark $s_ccgame_seq
+    }
+}
+

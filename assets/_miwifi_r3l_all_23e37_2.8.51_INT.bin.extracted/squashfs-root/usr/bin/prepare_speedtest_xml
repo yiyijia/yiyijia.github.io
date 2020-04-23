@@ -1,0 +1,317 @@
+#!/usr/bin/env lua
+local posix = require("Posix")
+local ubus = require ("ubus")
+local fs   = require "nixio.fs"
+
+local speedtest_urls = {
+    "c.speedtest.net/speedtest-servers-static.php",
+    "www.speedtest.net/speedtest-servers-static.php",
+    "www.speedtest.net/speedtest-servers.php",
+    "c.speedtest.net/speedtest-servers.php",
+}
+
+local client = {
+    ['ip']   = "",
+    ['lat']  = "",
+    ['lon']  = "",
+    ['isp']  = "",
+    ['isptating']  = "",
+    ['rating']  = "",
+}
+
+local serverlist = {}
+local bestserver = {}
+local downloadurl = {}
+local uploadurl = {}
+
+function logger(loglevel,msg)
+    posix.openlog("speedtest","np",LOG_USER)
+    posix.syslog(loglevel,msg)
+    posix.closelog()
+end
+
+function geturl(url)
+    local handle = io.popen("curl -q -k -s -m 120 "..url)
+    local result = handle:read("*a")
+    handle:close()
+    return result
+end
+
+function geturl2(url)
+    return [[<settings> </settings>i<server url="http://speedtest.mmsn.ru/speedtest/upload.php" lat="68.9543" lon="33.1076" name="Murmansk" country="Russian Federation" cc="RU" sponsor="M2C     " id="1521"  url2="http://pingtest.mmsn.ru/speedtest/upload.php" host="speedtest.mmsn.ru:8080" />
+   9<client ip="106.39.75.134" lat="39.9289" lon="116.3883" isp="China Telecom" isprating="3.8" rating="0" ispdlavg="31163" ispulavg="8850" loggedin="0"/>6 <server url="http://ookla.trollfjord.no/speedtest/upload.php" lat="68.5656" lon="14.9042" name="Stokmarknes" country="Norway" cc="NO" sponsor="Trollfjord      Broadband AS" id="4755"  url2="http://ookla01.trollfjord.no/speedtest/upload.php" host="ookla.trollfjord.no:8080" />
+   7 <server url="http://speedtest.oltv.ru/speedtest/upload.php" lat="68.1500" lon="33.2833" name="Olenegorsk" country="Russian Federation" cc="RU" sponsor="S     C Oltelecom" id="1996"  url2="http://st.oltv.ru/speedtest/upload.php" host="speedtest.oltv.ru:8080" />
+<server url="http://speedtest.oltv.ru/speedtest/upload.php" lat="68.1500" lon="33.2833" name="Olenegorsk" country="Russian Federation" cc="RU" sponsor="S     C Ol    telecom" id="1996"  url2="http://st.oltv.ru/speedtest/upload.php" host="speedtest.oltv.ru:8080" />]]
+end
+
+function post(url, fields)
+    local handle = io.popen("curl -q -k -s -m 160"..url.." -d '"..fields.."'")
+    local result = handle:read("*a")
+    handle:close()
+    return result
+end
+
+function distance(lat1, lon1, lat2, lon2)
+    radius = 6371
+    dlat = math.rad(lat2 - lat1)
+    dlon = math.rad(lon2 - lon1)
+    a = (math.sin(dlat / 2) * math.sin(dlat / 2) +
+         math.cos(math.rad(lat1)) *
+         math.cos(math.rad(lat2)) * math.sin(dlon / 2) *
+         math.sin(dlon / 2))
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    d = radius * c
+
+    return d
+end
+
+function get_config()
+    local client_config = geturl("www.speedtest.net/speedtest-config.php")
+    logger(3, string.format("Getting client config from speedtest.net"))
+    if client_config then
+        local _,_,clnt = string.find(client_config, '(<client ip=[^/]*)')
+        if clnt then
+	    local _,_,ip  = string.find(clnt, 'ip="([^"]*)')
+	    local _,_,isp = string.find(clnt, 'isp="([^"]*)')
+            local _,_,lat = string.find(clnt, 'lat="([^"]*)')
+            local _,_,lon = string.find(clnt, 'lon="([^"]*)')
+
+            if ip and isp and lat and lon then
+                client.ip  = ip
+                client.isp = isp
+                client.lat = lat
+                client.lon = lon
+                return
+            end
+        end
+    end
+    client.ip = "0"
+end
+
+function get_serverlist()
+    for _,v in pairs(speedtest_urls) do
+        local url = v
+        print("downloading serverlist from "..url)
+	local servers = geturl(url)
+        if servers then
+            _,i = string.find(servers, '<settings>')
+            if not i  then
+                print("xml catn fine head")
+            else
+                _,j = string.find(servers, '</settings>')
+                if not j  then
+                    print("xml catn fine end")
+                else
+                    return servers
+                end
+            end
+        end
+    end
+end
+
+function get_url_path(url)
+    ts = string.reverse(url)
+    _, i = string.find(ts,"/")
+    m = string.len(ts)-i+1
+    return string.sub(url, 1, m)
+end
+
+function parse_server_config(server_config)
+    for m,n,v in string.gfind(server_config,'(<server[^>]*)') do
+        local server = {
+            ['url']= "",
+            ['lat']= "",
+            ['lon']= "",
+            ['name'] = "",
+            ['country'] = "",
+            ['dd'] = 0,
+            ['urlpath'] = "",
+        }
+        local _,_,url = string.find(m, 'url="([^"]*)')
+        local _,_,lat = string.find(m, 'lat="([^"]*)')
+        local _,_,lon = string.find(m, 'lon="([^"]*)')
+        local _,_,name = string.find(m, 'name="([^"]*)')
+        local _,_,country = string.find(m, 'country="([^"]*)')
+
+        if url and lat and lon and name and country then
+            server.url = url
+            server.lat = lat
+            server.lon = lon
+            server.name = name
+            server.country = country
+            server.dd = distance(tonumber(client.lat),tonumber(client.lon),tonumber(lat),tonumber(lon))
+            server.urlpath = get_url_path(url)
+            table.insert(serverlist, server)
+        end
+    end
+end
+
+function server_comps(a,b)
+    return a.dd < b.dd
+end
+
+function prepare_download_urls()
+    for k,v in pairs(bestserver) do
+        table.insert(downloadurl, string.format("%s%s", v.urlpath, "random500x500.jpg"))
+        table.insert(downloadurl, string.format("%s%s", v.urlpath, "random750x750.jpg"))
+        table.insert(downloadurl, string.format("%s%s", v.urlpath, "random1000x1000.jpg"))
+        table.insert(downloadurl, string.format("%s%s", v.urlpath, "random1500x1500.jpg"))
+        table.insert(downloadurl, string.format("%s%s", v.urlpath, "random2000x2000.jpg"))
+        table.insert(downloadurl, string.format("%s%s", v.urlpath, "random2500x2500.jpg"))
+        table.insert(downloadurl, string.format("%s%s", v.urlpath, "random3000x3000.jpg"))
+        table.insert(downloadurl, string.format("%s%s", v.urlpath, "random3500x3500.jpg"))
+        table.insert(downloadurl, string.format("%s%s", v.urlpath, "random4000x4000.jpg"))
+    end
+end
+
+function prepare_upload_urls()
+    for k,v in pairs(bestserver) do
+        table.insert(uploadurl, string.format("%s", v.url))
+    end
+    for k,v in pairs(bestserver) do
+        table.insert(uploadurl, string.format("%s", v.url))
+    end
+end
+
+function get_bestserver_from_matool(lat, lon)
+    cmd = "matool --method api_call --params /device/get_speed_test_site {\"lat\":"..lat..",\"lon\":"..lon.."}"
+    local handle = io.popen(cmd)
+    local result = handle:read("*a")
+    handle:close()
+
+    local JSON = require("luci.json")
+    if result then
+        local res = JSON.decode(result)
+        if res==nil or res.data==nil or res.data.list==nil then
+            return
+        end
+
+	list_table = res.data.list
+	if list_table then
+	    for k,v in ipairs(list_table) do
+                local server = {
+                    ['url']= "",
+                    ['lat']= "",
+                    ['lon']= "",
+                    ['name'] = "",
+                    ['country'] = "",
+                    ['dd'] = 0,
+                    ['urlpath'] = "",
+                }
+
+                if v.url and v.lat and v.lon and v.name and v.country then
+                    server.url = v.url
+                    server.lat = v.lat
+                    server.lon = v.lon
+                    server.name = v.name
+                    server.country = v.country
+                    server.urlpath = get_url_path(v.url)
+                    table.insert(bestserver, server)
+                end
+            end
+	end
+    end
+end
+
+function main()
+    get_config()
+    if client.ip == "0" then
+        logger(3, string.format("cannt get client config"))
+        print("Cannt get client config")
+        return
+    else
+        print("client ip: "..client.ip.." isp: "..client.isp.." lat: "..client.lat.." lon: "..client.lon)
+        logger(3, string.format("client ip: %s isp: %s lat: %s lon: %s", client.ip, client.isp, client.lat, client.lon))
+    end
+
+--[[
+    local server_config = get_serverlist()
+    if server_config then
+        print("serverlist len is "..string.len(server_config))
+        parse_server_config(server_config)
+    else
+        print("Cannt get server config")
+        logger(3, string.format("cannt get server config"))
+        return
+    end
+
+    print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    for k,v in pairs(serverlist) do
+        print(v.url, v.name, v.dd, v.urlpath)
+    end
+
+    table.sort(serverlist,server_comps)
+    local bestnum = 0
+    for k,v in pairs(serverlist) do
+        table.insert(bestserver, v)
+        bestnum = bestnum + 1
+        if bestnum > 4 then
+            break
+        end
+    end
+]]
+    get_bestserver_from_matool(client.lat, client.lon)
+    local bestnum = 0
+    bestnum = table.getn(bestserver)
+    if bestnum < 4 then
+        print("server list num is not enough "..bestnum)
+        logger(3, string.format("server list num is not enough"))
+        return
+    end
+
+    print("---------------------best server-------------------------")
+    for k,v in pairs(bestserver) do
+        print(v.url, v.name, v.dd, v.urlpath)
+    end
+
+    prepare_download_urls()
+    print("---------------------download urls------------------------")
+    for k,v in pairs(downloadurl) do
+        print(v)
+    end
+
+    prepare_upload_urls()
+    print("---------------------upload urls----------------------------------")
+    for k,v in pairs(uploadurl) do
+        print(v)
+    end
+
+    local downurl = ""
+    for k,v in pairs(downloadurl) do
+        downurl = string.format("%s\n		<item url=\"%s\"/>",downurl, v)
+    end
+
+    local upurl = ""
+    for k,v in pairs(uploadurl) do
+        upurl = string.format("%s\n		<item uploadurl=\"%s\"/>",upurl, v)
+    end
+
+    local csinfo = ""
+    csinfo = string.format("		<item client ip=\"%s\" lat=\"%s\" lon=\"%s\" isp=\"%s\"/>", client.ip, client.lat, client.lon, client.isp)
+
+    for k,v in pairs(bestserver) do
+        csinfo = string.format("%s\n		<item server url=\"%s\" lat=\"%s\" lon=\"%s\" name=\"%s\" country=\"%s\" dd=\"%s\"/>", csinfo, v.url, v.lat, v.lon, v.name, v.country, v.dd)
+    end
+
+    local filecontent = ""
+    filecontent = string.format("%s\n", "<xml version=\"1.0\">")
+    filecontent = string.format("%s%s\n", filecontent, "<root>")
+    filecontent = string.format("%s%s", filecontent, "	<class type=\"1\">")
+    filecontent = string.format("%s%s\n", filecontent, downurl)
+    filecontent = string.format("%s%s\n", filecontent, "	</class>")
+    filecontent = string.format("%s%s", filecontent, "	<class type=\"3\">")
+    filecontent = string.format("%s%s\n", filecontent, upurl)
+    filecontent = string.format("%s%s\n", filecontent, "	</class>")
+    filecontent = string.format("%s%s\n", filecontent, "	<class type=\"5\">")
+    filecontent = string.format("%s%s\n", filecontent, csinfo)
+    filecontent = string.format("%s%s\n", filecontent, "	</class>")
+    filecontent = string.format("%s%s", filecontent, "</root>")
+
+    logger(3, string.format("write speedtest_urls.xml ok"))
+    xmlfile = io.open("/tmp/speedtest_urls.xml", "w")
+    xmlfile:write(filecontent)
+    xmlfile:close()
+end
+
+main()
+

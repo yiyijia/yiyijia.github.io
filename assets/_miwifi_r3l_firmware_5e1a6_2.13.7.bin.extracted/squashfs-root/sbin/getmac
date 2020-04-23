@@ -1,0 +1,39 @@
+#!/bin/sh
+
+usage() {
+	echo "getmac <wl1 | wl0 | eth | *>"
+	echo "example: getmac"
+	echo "         getmac eth"
+	echo "         getmac wl0"
+	echo "         getmac wl1"
+}
+
+fac_mtd=`cat /proc/mtd | grep Factory | cut -d ":" -f 1`
+[ -z "$fac_mtd" ] && exit 1
+
+ethadr=`hexdump -C /dev/"$fac_mtd" -s 40 -n 6 | awk 'NR<2 {print $2":"$3":"$4":"$5":"$6":"$7}'`
+wl1adr=`hexdump -C /dev/"$fac_mtd" -s 4 -n 6 | awk 'NR<2 {print $2":"$3":"$4":"$5":"$6":"$7}'`
+wl0adr=`hexdump -C /dev/"$fac_mtd" -s 32772 -n 6 | awk 'NR<2 {print $2":"$3":"$4":"$5":"$6":"$7}'`
+
+case $1 in
+	-h)
+	usage
+	;;
+	wl0)
+	echo "$wl0adr"
+	;;
+	wl1)
+	echo "$wl1adr"
+	;;
+	lan|wan|eth)
+	echo "$ethadr"
+	;;
+	*)
+	if [ "$wl0adr" = "ff:ff:ff:ff:ff:ff" ]; then
+		# assume no wl0 5G adapter
+		echo "$ethadr,$wl1adr"
+	else
+		echo "$ethadr,$wl1adr,$wl0adr"
+	fi
+	;;
+esac

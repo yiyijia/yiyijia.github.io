@@ -1,0 +1,82 @@
+#!/bin/sh
+
+if [ $# -eq 0 ]; then
+	echo "wps [commands] [parameters]"
+	echo "	pbc"
+	echo "	status"
+	echo "	stamac"
+fi
+
+apmode=`uci get misc.hardware.model 2>/dev/null`
+
+case $1 in
+        "pbc")
+                case $2 in
+                        "wl0"|"wl1")
+                                iwpriv $2 set WscConfMode=6
+                                iwpriv $2 set WscMode=2
+                                iwpriv $2 set WscGetConf=1
+                                ;;
+                        "")
+                                if [ "$apmode" = "R1CM" ]; then
+                                        iwpriv wl0 set WscConfMode=6
+                                        iwpriv wl0 set WscMode=2
+                                        iwpriv wl0 set WscGetConf=1
+                                fi
+                                iwpriv wl1 set WscConfMode=6
+                                iwpriv wl1 set WscMode=2
+                                iwpriv wl1 set WscGetConf=1
+                                ;;
+                        *) echo "wps $1 $2 Parameter $2 is not supported";;
+                esac
+                ;;
+        "status")
+                if [ "$apmode" = "R1CM" ]; then
+                        sta5=`iwpriv wl0 get WscLatestStaMacAddr | sed -n '2p'`
+                        sta2=`iwpriv wl1 get WscLatestStaMacAddr | sed -n '2p'`
+                        if [ -n "$sta5" ]; then
+                                iwpriv wl0 get WscStatus | sed -n '1p' | awk -F ":" '{print $2}'
+                        elif [ -n "$sta2" ]; then
+                                iwpriv wl1 get WscStatus | sed -n '1p' | awk -F ":" '{print $2}'
+                        else
+                                iwpriv wl1 get WscStatus | sed -n '1p' | awk -F ":" '{print $2}'
+                        fi
+                else
+                        iwpriv wl1 get WscStatus | sed -n '1p' | awk -F ":" '{print $2}'
+                fi
+                ;;
+        "stamac")
+                if [ "$apmode" = "R1CM" ]; then
+                        iwpriv wl0 get WscLatestStaMacAddr | sed -n '2p'
+                fi
+                iwpriv wl1 get WscLatestStaMacAddr | sed -n '2p'
+                ;;
+        "stop")
+                case $2 in
+                        "wl0"|"wl1")
+                                iwpriv $2 set WscStop=1
+                                ;;
+                        "")
+                                if [ "$apmode" = "R1CM" ]; then
+                                        iwpriv wl0 set WscStop=1
+                                fi
+                                iwpriv wl1 set WscStop=1
+                                ;;
+                        *) echo "wps $1 $2 Parameter $2 is not supported";;
+                esac
+                ;;
+        "wl0"|"wl1")
+                case $2 in
+                        "pbc")
+                                iwpriv $1 set WscConfMode=6
+                                iwpriv $1 set WscMode=2
+                                iwpriv $1 set WscGetConf=1
+                                ;;
+                        "stop")
+                                iwpriv $1 set WscStop=1
+                                ;;
+                        *) echo "wps $1 $2 Parameter $2 is not supported";;
+                esac
+                ;;
+        *) echo "Parameter $1 is not supported";;
+esac

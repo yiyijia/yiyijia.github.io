@@ -1,0 +1,4 @@
+config ipv6 settings
+    option enabled 0
+
+
