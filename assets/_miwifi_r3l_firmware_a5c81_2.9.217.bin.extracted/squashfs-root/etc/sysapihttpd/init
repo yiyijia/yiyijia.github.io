@@ -1,4 +1,0 @@
-#!/bin/sh
-
-FCGI_CONNECTION=4
-FCGI_NUM=2

@@ -1,7 +1,0 @@
-#!/bin/sh
-
-special='/tmp/state/pppoe_special'
-[ -f "$special" ] && {
-  specdial=$(cat "$special")
-  logger stat_points_none "specdial=no_$specdial"
-}

@@ -1,6 +1,0 @@
-#!/bin/sh
-uci batch <<-EOF
-	set luci.languages.ko_kr=한국
-        commit luci
-EOF
-

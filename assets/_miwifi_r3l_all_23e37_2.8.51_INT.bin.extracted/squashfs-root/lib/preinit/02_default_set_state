@@ -1,5 +1,0 @@
-#!/bin/sh
-
-set_state() {
-	return 0
-}

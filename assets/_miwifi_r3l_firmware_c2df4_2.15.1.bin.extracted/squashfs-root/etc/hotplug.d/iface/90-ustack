@@ -1,6 +1,0 @@
-#!/bin/sh
-
-if [ "$ACTION" = "ifup" -a "$INTERFACE" = "lan" ]; then
-    # for http url
-    [ -f /etc/init.d/ustack ] && /etc/init.d/ustack restart
-fi

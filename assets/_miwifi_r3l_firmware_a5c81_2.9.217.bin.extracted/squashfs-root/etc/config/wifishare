@@ -1,6 +1,0 @@
-config global 'global'
-        option disabled '1'
-        option auth_timeout '90'
-        option timeout '86400'
-
-

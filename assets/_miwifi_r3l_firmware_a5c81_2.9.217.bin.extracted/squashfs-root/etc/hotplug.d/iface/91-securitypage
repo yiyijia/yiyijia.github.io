@@ -1,5 +1,0 @@
-#!/bin/sh
-[ "$ACTION" = "ifup" ] && [ "$INTERFACE" = "wan" ] && {
-    /etc/init.d/securitypage restart
-}
-

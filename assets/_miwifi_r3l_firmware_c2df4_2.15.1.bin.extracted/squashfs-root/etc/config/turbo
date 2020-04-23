@@ -1,6 +1,0 @@
-config service ccgame
-	option name     'ccgame'
-
-config service ipv6
-    option name     'ipv6'
-    option flag     '0'

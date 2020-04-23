@@ -1,1 +1,0 @@
-CryptoJS.pad.Iso97971={pad:function(a,b){a.concat(CryptoJS.lib.WordArray.create([2147483648],1));CryptoJS.pad.ZeroPadding.pad(a,b)},unpad:function(a){CryptoJS.pad.ZeroPadding.unpad(a);a.sigBytes--}};
