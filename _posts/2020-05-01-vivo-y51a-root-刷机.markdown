@@ -1,0 +1,14 @@
+---
+layout: post
+title:  "VIVO Y51A 开启root"
+date:   2020-05-01 09:23:39 +0800
+categories: android
+---
+
+# VIVO root 步骤
+1. 修改 ROM 3.8.1 , 加入SuperU
+2. usb线刷入 ROM
+3. 安装 root大师
+4. root大师 安装kingroot
+5. 更新superU ,更新成功则表示root成功
+6. 重启后生效
