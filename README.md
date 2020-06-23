@@ -39,3 +39,7 @@ Having trouble with Pages? Check out our [documentation](https://help.github.com
 run ```
 bundle exec jekyll serve
 ```
+
+run new post```
+ bundle exec jekyll post "Z80-Computer"
+```
